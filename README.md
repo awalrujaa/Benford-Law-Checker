@@ -11,11 +11,11 @@ If leading digits 1 – 9 had an equal probability, they’d each occur 11.1% of
 The graph displays the distribution of leading digits according to Benford’s law.
 
 How to Use
-Install the dependencies
+Install the dependencies:
 pip install pyramid
 
-Create or download a csv file of 10k+ words in root directory of project and run
-python app.py
+Create or download a csv file of 10k+ numbers.
+Run python app.py.
 
 Open index.html and upload the csv.
 
