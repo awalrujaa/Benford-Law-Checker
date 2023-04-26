@@ -1,54 +1,56 @@
-import csv
-import math
-import json
+import csv, json
+from wsgiref.simple_server import make_server
 from pyramid.config import Configurator
 from pyramid.response import Response
 
-def benfords_law(num_list):
-    """
-    Checks if the given list of numbers follows Benford's Law.
-    Returns True if the list follows Benford's Law, False otherwise.
-    """
-    first_digits = [int(str(num)[0]) for num in num_list]
-    digit_counts = [first_digits.count(digit) for digit in range(1, 10)]
-    digit_frequencies = [count / len(num_list) for count in digit_counts]
-    benford_frequencies = [math.log10(1 + 1/digit) for digit in range(1, 10)]
-    return all(abs(benford_frequencies[i] - digit_frequencies[i]) < 0.02 for i in range(9))
 
-def check_benford_csv(file_path):
-    """
-    Reads a CSV file and checks if the first column of numbers follows Benford's Law.
-    Returns True if the first column follows Benford's Law, False otherwise.
-    """
-    with open(file_path, 'r') as csv_file:
-        reader = csv.reader(csv_file)
-        num_list = [int(row[0]) for row in reader if row and row[0].isdigit()]
-    return benfords_law(num_list)
+def hello_world(request):
+    return Response('Hello World!')
 
-def benford_view(request):
-    """
-    Pyramid view function for the /benford endpoint.
-    Reads the uploaded CSV file, checks if the first column follows Benford's Law,
-    and returns a JSON response with the result.
-    """
-    if 'csvfile' not in request.POST:
-        return Response(json.dumps({"error": "No CSV file provided."}), status=400)
+
+def benford(request):
+    # get the uploaded CSV file
+    # csv_file = request.POST['csv_file'].file
+    # print(csv_file)
+    first_digits = []
+    with open('numbers.csv') as csvfile:
+        csvreader = csv.reader(csvfile)
+        for row in csvreader:
+            for item in row:
+                if item.isdigit():
+                    first_digit = int(item[0])
+                
     
-    csvfile = request.POST['csvfile'].file
-    csvreader = csv.reader(csvfile)
-    num_list = [int(row[0]) for row in csvreader if row and row[0].isdigit()]
-    
-    if len(num_list) < 10000:
-        return Response(json.dumps({"error": "CSV file must have 10k+ rows."}), status=400)
-    
-    if benfords_law(num_list):
-        return Response(json.dumps({"result": "CSV file conforms to Benford's Law."}), content_type="application/json")
-    else:
-        return Response(json.dumps({"result": "CSV file does not conform to Benford's Law."}), content_type="application/json")
+    # calculate the expected frequencies based on Benford's Law
+    expected_freq = [0.301, 0.176, 0.125, 0.097, 0.079, 0.067, 0.058, 0.051, 0.046]
+
+    # calculate the actual frequencies
+    actual_freq = []
+    for i in range(1, 10):
+        count = first_digits.count(i)
+        freq = count / len(first_digits)
+        actual_freq.append(freq)
+
+    # check if the actual frequencies conform to Benford's Law
+    is_conform = True
+    for i in range(0, 9):
+        if abs(expected_freq[i] - actual_freq[i]) > 0.02:
+            is_conform = False
+            break
+
+    # prepare the response JSON
+    response_data = {'is_conform': is_conform, 'actual_freq': actual_freq}
+    with open('benford_result.json', 'w') as outfile:
+        json.dump(response_data, outfile)
+
+    return Response(json.dumps(response_data))
 
 if __name__ == '__main__':
-    config = Configurator()
-    config.add_route('benford', '/benford')
-    config.add_view(benford_view, route_name='benford', renderer='json')
-    app = config.make_wsgi_app()
-    serve(app, host='0.0.0.0', port=8080)
+    with Configurator() as config:
+        config.add_route('hello', '/')
+        config.add_view(hello_world, route_name='hello')
+        config.add_route('benford', '/benford')
+        config.add_view(benford, route_name='benford', renderer='json')
+        app = config.make_wsgi_app()
+    server = make_server('0.0.0.0', 6543, app)
+    server.serve_forever()
